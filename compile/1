@@ -1,0 +1,90 @@
+/* xm.c = xmmap xmunmap */
+
+#include <conf.h>
+#include <kernel.h>
+#include <proc.h>
+#include <paging.h>
+
+
+/*-------------------------------------------------------------------------
+ * xmmap - xmmap
+ *-------------------------------------------------------------------------
+ */
+SYSCALL xmmap(int virtpage, bsd_t source, int npages)
+{
+  /* other test cases can be written */
+
+  kprintf("xmmap - to be implemented!\n");
+  if(source< 0 || source> 7 ){
+		return SYSERR;
+	}else{
+ 		// 'source' is the backing store number, we set all the parameters of the bsm_tab for this store to map
+ 		bsm_tab[source].bs_pid 	  = currpid;
+		bsm_tab[source].bs_status = 1; 		/* setting the mapping */
+		bsm_tab[source].bs_vpno   = virtpage;
+		bsm_tab[source].bs_npages = npages;
+		bsm_tab[source].bs_sem    = 0;
+
+		bs_map_t *map = proctab[currpid].bs_map[source];
+		map->bs_status = 1;
+		map->bs_vpno   = virtpage;
+		map->bs_npages = npages;
+
+		return OK;
+	}
+  //return SYSERR;
+}
+
+
+
+/*-------------------------------------------------------------------------
+ * xmunmap - xmunmap
+ *-------------------------------------------------------------------------
+ */
+SYSCALL xmunmap(int virtpage)
+{	
+	//virtual page has to be beyond 4096, as the virtual memory is beyond 4096 in the Xinu memory location
+	if(virtpage < 4096){ 
+		kprintf("Virtual memory belong beyond 4096\n");
+	}
+	
+	int *store_ptr, *npages;
+	store_ptr = getmem( sizeof(int *) );
+	npages	  = getmem( sizeof(int *) );
+
+	//backing store lookup function for the required tupple 
+	if( bstore_lookup(currpid, virtpage, npages, store_ptr) == SYSERR ){
+		kprintf("Lookup failed\n");
+		return SYSERR;
+	}else{
+		kprintf("Lookup success\n");
+		return OK;
+	}	
+	
+	
+  
+  kprintf("To be implemented!");
+  return SYSERR;
+}
+
+/* Backing store lookup funciton */
+SYSCALL bstore_lookup(int pid, int vpage, int *npages, int *store_ptr){
+		
+	//Checking the backing store for the current process
+	int i;
+	for(i=0;i<8;i++){
+		bs_map_t *bs = proctab[pid].bs_map[i];
+		// condition for mapped backing store and present in the mapped backing store
+		if( (bs->bs_status == 1) && (vpage >= bs->bs_vpno) && (vpage < bs->bs_vpno+bs->bs_npages) ){
+			kprintf("Mapping found\n");
+			*store_ptr = i;
+			*npages = vpage - bs->bs_vpno;
+			return OK;
+		}else{
+			*store_ptr = -1;
+			*npages    = -1;
+			kprintf("Mapping not found\n");
+			return SYSERR;
+		}
+	}
+}
